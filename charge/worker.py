@@ -2,7 +2,8 @@ from .dtos import DebtDTO
 
 
 class Worker:
-    processed_debts_db = set()
+    def __init__(self) -> None:
+        self.processed_debts_db = set()
 
     def _generate_boleto(self, debt: DebtDTO):
         boleto = f"Favor {debt.name}, pague o montante R${debt.debt_amount}"
@@ -18,10 +19,13 @@ class Worker:
             return True
 
     def async_debt_processing(self, debts_dtos: list[DebtDTO]):
+        debt_dtos_that_email_was_sent = []
         for debt in debts_dtos:
             if not self._check_if_debt_is_already_processed(debt):
-                self.processed_debts_db.add(debt.debt_id)
                 boleto = self._generate_boleto(debt)
                 self._send_email(debt.email, boleto)
+                self.processed_debts_db.add(debt.debt_id)
+                debt_dtos_that_email_was_sent.append(debt)
             else:
                 print(f"Débito {debt.debt_id} já processado")
+        return debt_dtos_that_email_was_sent
