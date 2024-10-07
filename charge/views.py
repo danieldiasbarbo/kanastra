@@ -91,7 +91,7 @@ def upload_csv(request):
                     status=400,
                 )
 
-        # Suposed to be assyncronous using celery and return the job_id to be processed by the workers
+        # Suposed to be assyncronous using celery and a message broker (Redis, MQTT, Kafka etc.) and return the job_id to be processed by the workers
         Worker().async_debt_processing(list_debts_dtos)
 
         return JsonResponse(
