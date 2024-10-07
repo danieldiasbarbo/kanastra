@@ -1,0 +1,4 @@
+name,governmentId,email,debtAmount,debtDueDate,debtId
+John Doe,11111111111,johndoe@kanastra.com.br,1000000.00,2022-10-12,1adb6ccf-ff16-467f-bea7-5f05d494280f 
+Person Name,11111111112,person@kanastra.com.br,105000.00,2024-11-01,2adb6ccf-ff16-467f-bea7-5f05d494280a
+Person Name,11111111112,person@kanastra.com.br,105000.00,2024-11-01,2adb6ccf-ff16-467f-bea7-5f05d494280a
