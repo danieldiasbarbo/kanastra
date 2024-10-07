@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from datetime import datetime
 from .dtos import DebtDTO
-import worker
+from .worker import Worker
 
 
 def _parse_row(row) -> DebtDTO:
@@ -25,7 +25,6 @@ def _parse_row(row) -> DebtDTO:
         debt_amount=debt_amount,
         debt_due_date=debt_due_date,
         debt_id=debt_id,
-        debt_dto=debt_dto,
     )
 
     return debt_dto
@@ -93,7 +92,7 @@ def upload_csv(request):
                 )
 
         # Suposed to be assyncronous using celery and return the job_id to be processed by the workers
-        worker.process_debts(list_debts_dtos)
+        Worker().async_debt_processing(list_debts_dtos)
 
         return JsonResponse(
             {"message": "Arquivo CSV está sendo processado"}, status=200
