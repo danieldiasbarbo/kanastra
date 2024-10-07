@@ -6,11 +6,32 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from datetime import datetime
+from .dtos import DebtDTO
+import worker
 
 
-@csrf_exempt
-@require_POST
-def upload_csv(request):
+def _parse_row(row) -> DebtDTO:
+    name = row["name"]
+    government_id = row["governmentId"]
+    email = row["email"]
+    debt_amount = float(row["debtAmount"])
+    debt_due_date = datetime.strptime(row["debtDueDate"], "%Y-%m-%d").date()
+    debt_id = UUID(row["debtId"].strip())
+
+    debt_dto = DebtDTO(
+        name=name,
+        government_id=government_id,
+        email=email,
+        debt_amount=debt_amount,
+        debt_due_date=debt_due_date,
+        debt_id=debt_id,
+        debt_dto=debt_dto,
+    )
+
+    return debt_dto
+
+
+def _check_params_in_request(request):
     if "file" not in request.FILES:
         return JsonResponse({"error": "Arquivo CSV não encontrado."}, status=400)
 
@@ -21,38 +42,49 @@ def upload_csv(request):
             {"error": "Formato de arquivo inválido, esperado .csv"}, status=400
         )
 
+
+def _check_file_columns(reader):
+    expected_columns = [
+        "name",
+        "governmentId",
+        "email",
+        "debtAmount",
+        "debtDueDate",
+        "debtId",
+    ]
+
+    if not expected_columns == reader.fieldnames:
+        return JsonResponse(
+            {
+                "error": "Formato de colunas inválido. Colunas esperadas: {}".format(
+                    ", ".join(expected_columns)
+                )
+            },
+            status=400,
+        )
+
+
+@csrf_exempt
+@require_POST
+def upload_csv(request):
+    if exception := _check_params_in_request(request):
+        return exception
+
+    file = request.FILES["file"]
+
     try:
         decoded_file = file.read().decode("utf-8")
         io_string = io.StringIO(decoded_file)
         reader = csv.DictReader(io_string)
 
-        expected_columns = [
-            "name",
-            "governmentId",
-            "email",
-            "debtAmount",
-            "debtDueDate",
-            "debtId",
-        ]
+        if exception := _check_file_columns(reader):
+            return exception
 
-        if not expected_columns == reader.fieldnames:
-            return JsonResponse(
-                {
-                    "error": "Formato de colunas inválido. Colunas esperadas: {}".format(
-                        ", ".join(expected_columns)
-                    )
-                },
-                status=400,
-            )
-
+        list_debts_dtos = []
         for row in reader:
             try:
-                name = row["name"]
-                government_id = row["governmentId"]
-                email = row["email"]
-                debt_amount = float(row["debtAmount"])
-                debt_due_date = datetime.strptime(row["debtDueDate"], "%Y-%m-%d").date()
-                debt_id = UUID(row["debtId"].strip())
+                debt_dto = _parse_row(row)
+                list_debts_dtos.append(debt_dto)
 
             except (ValueError, KeyError, ValidationError) as e:
                 return JsonResponse(
@@ -60,8 +92,11 @@ def upload_csv(request):
                     status=400,
                 )
 
+        # Suposed to be assyncronous using celery and return the job_id to be processed by the workers
+        worker.process_debts(list_debts_dtos)
+
         return JsonResponse(
-            {"message": "Arquivo CSV processado com sucesso!"}, status=200
+            {"message": "Arquivo CSV está sendo processado"}, status=200
         )
 
     except Exception as e:
